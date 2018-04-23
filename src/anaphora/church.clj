@@ -1,10 +1,8 @@
-(ns church.core
-  (:require [clojure.data :refer [diff]]
-            [clojure.pprint :refer [pprint]]
+(ns anaphora.church
+  (:require [clojure.pprint :refer [pprint]]
             [clojure.template :refer [apply-template]]
             [clojure.walk :refer [macroexpand-all]]
-            [com.rpl.specter :refer :all]
-            [com.positronic-solutions.pulley.cps :refer :all]))
+            [com.rpl.specter :refer :all :exclude [pred]]))
 
 (def TREE
   (recursive-path
@@ -50,7 +48,7 @@
 (defn add  [m n] (fn [f] (fn [x] ((m f) ((n f) x)))))
 (defn mult [m n] (fn [f] (fn [x] ((m (n f)) x))))
 (defn pow  [m n] (fn [f] (fn [x] (((n m) f) x))))
-;; (defn pred   [n] (fn [f] (fn [x] (((n (fn [g] (fn [h] (h (g f))))) (fn [u] x)) (fn [u] u)))))
+(defn pred   [n] (fn [f] (fn [x] (((n (fn [g] (fn [h] (h (g f))))) (fn [u] x)) (fn [u] u)))))
 (defn sub  [m n] (fn [f] (fn [x] ((((n pred) m) f) x))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -154,7 +152,4 @@
             (if (zero? n')
               (fn [f x] x)
               (fn [f x]
-                (((f f) (dec n')) f (f x))))))) m)) inc 0)))) 
-
-(defn -main []
-  )
+                (((f f) (dec n')) f (f x))))))) m)) inc 0))))
