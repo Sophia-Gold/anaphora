@@ -1,12 +1,13 @@
 (ns anaphora
   (:require [anaphora.chain :refer :all]
             [anaphora.church :as church]
-            [clojure.pprint :refer [pprint]]
+            [fipp.edn :refer [pprint]]
             [clojure.string :as str]
             [com.positronic-solutions.pulley.cps :refer :all]
             [clojure.tools.analyzer :as ana]
             [clojure.tools.analyzer.jvm :refer [analyze]]
             [clojure.tools.analyzer.env :as env]
+            ;; [clojure.tools.decompiler :refer :all]))
             [no.disassemble :refer :all]))
 
 ;; (def chain
@@ -35,8 +36,7 @@
    (let [f (nth (iterate add-dim f)  ;; coerce `f` to dimensionality of `g`
                 (dec (long (count (ffirst g)))))
          f' (diff-unmixed1 f order 1)
-         g' (diff g order)]
-     (println (count (call-cc disassemble)))
+         g' (diff g order)] 
      (->> order
           partition-set
           (map (fn [p]
@@ -57,15 +57,15 @@
      {[1 1] 16, [1 0] 24, [0 1] 40, [0 0] 68}))
 
 (defn stacks []
-  (-> disassemble
-      call-cc
-      str/split-lines 
-      (filter #(re-find #"Stack" %))
-      (map (comp (fn [s] (map #(Long/parseLong (re-find #"\d+" %)) s))
-                 #(str/split % #",")))
-      (map #(zipmap [:stack :locals] %))
-      (sort-by :stack)
-      pprint))
+  (->> disassemble
+       call-cc
+       str/split-lines 
+       (filter #(re-find #"Stack" %)) 
+       (map (comp (fn [s] (map #(Long/parseLong (re-find #"\d+" %)) s))
+                  #(str/split % #",")))
+       (map #(zipmap [:stack :locals] %))
+       (sort-by :stack)
+       pprint))
 
 (defn get-cc []
   (call-cc 
