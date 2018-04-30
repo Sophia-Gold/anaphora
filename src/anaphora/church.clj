@@ -1,5 +1,5 @@
 (ns anaphora.church
-  (:require [fipp.edn :refer [pprint]]
+  (:require [fipp.edn :refer [pprint] :rename {pprint fipp}]
             [clojure.template :refer [apply-template]]
             [clojure.walk :refer [macroexpand-all]]
             [com.rpl.specter :refer :all :exclude [pred]]))
@@ -15,7 +15,7 @@
   (->> f
        macroexpand-all
       (transform [TREE] (comp symbol name))
-      pprint))
+      fipp))
 
 (defn church [n]
   (letfn [(succ [n] (fn [f] (fn [x] (f ((n f) x)))))]
@@ -42,12 +42,24 @@
 (defmacro eight [] '(fn [f] (fn [x] (f (f (f (f (f (f (f (f x)))))))))))
 (defmacro nine  [] '(fn [f] (fn [x] (f (f (f (f (f (f (f (f (f x))))))))))))
 
-(defmacro succ [n] '(fn [f] (fn [x] (f (~n f) x))))
-(defmacro add  [m n] '(fn [f] (fn [x] ((m f) ((n f) x)))))
-(defmacro mult [m n] '(fn [f] (fn [x] ((m (n f)) x))))
-(defmacro pow  [m n] '(fn [f] (fn [x] (((n m) f) x))))
-(defmacro pred   [n] '(fn [f] (fn [x] (((n (fn [g] (fn [h] (h (g f))))) (fn [u] x)) (fn [u] u)))))
-(defmacro sub  [m n] '(fn [f] (fn [x] ((((n pred) m) f) x))))
+(defmacro succ [n]   '(fn [f] (fn [x] (f (~n f) x))))
+(defmacro add  [m n] '(fn [f] (fn [x] ((~m f) ((~n f) x)))))
+(defmacro mult [m n] '(fn [f] (fn [x] ((~m (~n f)) x))))
+(defmacro pow  [m n] '(fn [f] (fn [x] (((~n ~m) f) x))))
+(defmacro pred   [n] '(fn [f] (fn [x] (((~n (fn [g] (fn [h] (h (g f))))) (fn [u] x)) (fn [u] u)))))
+(defmacro sub  [m n] '(fn [f] (fn [x] ((((~n pred) ~m) f) x))))
+
+(defmacro ctrue  []    '(fn [a] (fn [b] a)))
+(defmacro cfalse []    '(fn [a] (fn [b] b)))
+(defmacro cand [p q]   '(~p (~q ~p)))
+(defmacro cor  [p q]   '(~p (~p ~q)))
+(defmacro cnot [p]     '(~p (cfalse (ctrue))))
+(defmacro cxor [a b]   '(~a (cnot ~b) ~b))
+(defmacro cif  [p a b] '(~p ~a ~b))
+
+(defmacro czero? [n]   '(~n (fn [x] cfalse) ctrue))
+(defmacro leq?   [m n] '(czero? (minus ~m ~n)))
+(defmacro eq?    [m n] '(cand (leq ~m ~n) (leq ~n ~m)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
