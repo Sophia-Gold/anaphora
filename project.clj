@@ -11,8 +11,7 @@
                  [org.clojure/tools.analyzer "0.6.9"]
                  [org.clojure/tools.analyzer.jvm "0.7.2"]
                  [com.rpl/specter "1.1.0"]
-                 [fipp "0.6.12"]]
-  :exclusions [org.clojure/clojure]
+                 [fipp "0.6.12"]] 
   :repositories {"local" ~(str (.toURI (java.io.File. "maven_repository")))}
   :main ^:skip-aot anaphora
   :target-path "target/%s"
