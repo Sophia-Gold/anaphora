@@ -1,6 +1,7 @@
 (ns anaphora
-  (:require [anaphora.chain :refer :all]
-            [anaphora.church :as church] 
+  (:require [anaphora.chain :refer :all] 
+            [anaphora.church :as church]
+            [anaphora.util :refer :all]
             [clojure.tools.analyzer :as ana]
             [clojure.tools.analyzer.jvm :refer [analyze]]
             [clojure.tools.analyzer.env :as env]))
@@ -92,15 +93,6 @@
 ;;          (sequence (partial xf3 (partial xf2 xf1)))
 ;;          (apply add)))) 
 
-(defn deepcount
-  "Counts levels of nesting in *evenly* nested collections."
-  [coll]
-  (loop [i 1
-         coll coll]
-    (if (coll? (first coll))
-      (recur (inc i) (apply concat coll))
-      i)))
-
 (defmacro map->
   "Maps a series of forms over each level of a nested collection.
   Forms are applied from inside out, e.g. (map `f` (map `f` (map `f`))).
@@ -111,7 +103,7 @@
     (if (not-empty (next forms))
       (let [form (macroexpand (first forms))
             threaded (if (seq? form)
-                       (with-meta `(->> (map ~(first form) ~x) ~@(next form)) (meta form))
+                       (with-meta `(->> ~x (map ~(first form)) ~@(next form)) (meta form))
                        (list `map form x))]
         (recur threaded (next forms)))
       (list `map-indexed (first forms) x))))  ;; generalize: s/`map-indexed`/`map`
@@ -130,10 +122,11 @@
                  (get g'))
         xf3 #(*' (long (Math/pow 10 %1)) %2)]  ;; finishing function
     (apply add
-           (map-> x
-                  xf1
-                  xf2
-                  xf3))))
+           (expand
+            '(map-> x
+                    xf3
+                    xf2
+                    xf1)))))
 
 (defn chain4
   "Only works with fork of Clojure allowing nested literals.

@@ -1,22 +1,5 @@
 (ns anaphora.church
-  (:require [clojure.walk :refer [macroexpand-all]]
-            [com.rpl.specter :refer :all :exclude [pred]]
-            [fipp.edn :refer [pprint] :rename {pprint fipp}]))
-
-(def TREE
-  (recursive-path
-   [] p
-   (if-path coll?
-            [ALL p]
-            STAY)))
-
-(defn expand
-  "Pretty-printed macroexpansion with unqualified names."
-  [f]
-  (->> f
-       macroexpand-all
-      (transform [TREE] (comp symbol name))
-      fipp))
+  (:require [anaphora.util :refer :all]))
 
 (defn church [n]
   (letfn [(succ [n] (fn [f] (fn [x] (f ((n f) x)))))]
