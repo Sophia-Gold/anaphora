@@ -1,7 +1,6 @@
 (ns anaphora
   (:require [anaphora.chain :refer :all]
-            [anaphora.church :as church]
-            [fipp.edn :refer [pprint] :rename {pprint fipp}] 
+            [anaphora.church :as church] 
             [clojure.tools.analyzer :as ana]
             [clojure.tools.analyzer.jvm :refer [analyze]]
             [clojure.tools.analyzer.env :as env]))
@@ -93,31 +92,29 @@
 ;;          (sequence (partial xf3 (partial xf2 xf1)))
 ;;          (apply add)))) 
 
-(defmacro try? [body]
-  (try ~body
-       (catch IllegalArgumentException e
-         false)))
-
-(defn nmap
-  "Maps a series of functions over each level of a nested collection.
-  Returns an indexed function literal."
-  [coll & xforms]
-  (loop [xforms (vec xforms)
+(defn deepcount
+  "Counts levels of nesting in *evenly* nested collections."
+  [coll]
+  (loop [i 1
          coll coll]
-    (if (empty? xforms)
-      coll
-      (recur (pop xforms)
-             (nth (iterate #(map (peek xforms) %) coll) (count xforms))))))
-
-(defn deepcount [coll]
-  (loop [i 0
-         coll coll]
-    (if (coll? coll)
+    (if (coll? (first coll))
       (recur (inc i) (apply concat coll))
       i)))
 
-;; (map (fn [x] (map (fn [y] (map inc y))) x) [[[0 1 2]]])
-;; (map (fn [x] (map (fn [y] (concat y)))) [[[0] 1] 2])
+(defmacro map->
+  "Maps a series of forms over each level of a nested collection.
+  Forms are applied from inside out, e.g. (map `f` (map `f` (map `f`))).
+  All except for deepest (first in argument list) must be unary."
+  [x & forms]
+  (loop [x x
+         forms forms]
+    (if (not-empty (next forms))
+      (let [form (macroexpand (first forms))
+            threaded (if (seq? form)
+                       (with-meta `(->> (map ~(first form) ~x) ~@(next form)) (meta form))
+                       (list `map form x))]
+        (recur threaded (next forms)))
+      (list `map-indexed (first forms) x))))  ;; generalize: s/`map-indexed`/`map`
 
 ;; Luckily, we can alway solve that with macros :)
 (defn chain3
@@ -126,23 +123,21 @@
                (dec (long (count (ffirst g)))))
         f' (diff-unmixed1 f order 1)
         g' (diff g order)
-        xf1 #(*' (long (Math/pow 10 %1))
-                 %2) 
-        xf2 #(->> %2
-                  (interleave (range))
-                  (partition 2)
-                  (map %1) 
-                  (reduce +')
-                  (get g'))
-        xf3 #(->> %2
-                  (map %1)
-                  (apply mul)
-                  (mul (multi-compose (nth f' (dec (count %2))) g)))]
+        x (partition-set order)
+        xf1 (->> (apply mul)
+                 (mul (multi-compose (nth f' (dec (count x))) g)))
+        xf2 (->> (reduce +')
+                 (get g'))
+        xf3 #(*' (long (Math/pow 10 %1)) %2)]  ;; finishing function
     (apply add
-           (nmap (partition-set order) xf1 xf2 xf3))))
+           (map-> x
+                  xf1
+                  xf2
+                  xf3))))
 
 (defn chain4
-  "Only works with fork of Clojure allowing nested literals." 
+  "Only works with fork of Clojure allowing nested literals.
+  Note that nested variables shadow one another...not ideal." 
   [f g order]
   (let [f (nth (iterate add-dim f)
                (dec (long (count (ffirst g)))))
@@ -160,5 +155,24 @@
                     (mul (multi-compose (nth f' (dec (count %))) g))))
          (apply add))))
 
+;; (defn chain5
+;;   "*Actual* De Bruijn indices...now write a macro to make this work!" 
+;;   [f g order]
+;;   (let [f (nth (iterate add-dim f)
+;;                (dec (long (count (ffirst g)))))
+;;         f' (diff-unmixed1 f order 1)
+;;         g' (diff g order)] 
+;;     (->> order
+;;          partition-set
+;;          (map #(->> %1
+;;                     (map #(->> %2
+;;                                (map-indexed #(*' (long (Math/pow 10 %3)) 
+;;                                                  %4))
+;;                                (reduce +')
+;;                                (get g')))
+;;                     (apply mul)
+;;                     (mul (multi-compose (nth f' (dec (count %1))) g))))
+;;          (apply add))))
+  
 (defn -main []
   )

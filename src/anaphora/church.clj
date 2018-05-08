@@ -1,8 +1,7 @@
 (ns anaphora.church
-  (:require [fipp.edn :refer [pprint] :rename {pprint fipp}]
-            [clojure.template :refer [apply-template]]
-            [clojure.walk :refer [macroexpand-all]]
-            [com.rpl.specter :refer :all :exclude [pred]]))
+  (:require [clojure.walk :refer [macroexpand-all]]
+            [com.rpl.specter :refer :all :exclude [pred]]
+            [fipp.edn :refer [pprint] :rename {pprint fipp}]))
 
 (def TREE
   (recursive-path
@@ -11,7 +10,9 @@
             [ALL p]
             STAY)))
 
-(defn expand [f]
+(defn expand
+  "Pretty-printed macroexpansion with unqualified names."
+  [f]
   (->> f
        macroexpand-all
       (transform [TREE] (comp symbol name))
