@@ -15,7 +15,7 @@
   [f]
   (->> f
        macroexpand-all
-      (transform [TREE] (comp symbol name))
+      ;; (transform [TREE] (comp symbol name))
       fipp))
 
 (defn deepcount

@@ -25,8 +25,8 @@
                           (apply mul)))))
          (apply add))))
 
-;;  Doesn't work... De Bruijn indices fundamentally do not nest!
 ;; (defn chain2
+;;   "Doesn't work... De Bruijn indices fundamentally do not nest!"
 ;;   [f g order]
 ;;   (let [f (nth (iterate add-dim f)
 ;;                (dec (long (count (ffirst g)))))
@@ -44,19 +44,17 @@
 ;;                          (apply mul))))
 ;;          (apply add))))
 
-;; easily solved with lambda lifting, but not quite what we're going for...
 (defn chain2
+  "Easily solved with lambda lifting.
+  But not quite what we're going for..."
   [f g order]
   (let [f (nth (iterate add-dim f)
                (dec (long (count (ffirst g)))))
         f' (diff-unmixed1 f order 1)
         g' (diff g order)
-        xf1 #(*' (long (Math/pow 10 (first %))) 
-                 (second %))
+        xf1 #(*' (long (Math/pow 10 %1)) %2)
         xf2 #(->> %
-                  (interleave (range))
-                  (partition 2)
-                  (map xf1) 
+                  (map-indexed xf1) 
                   (reduce +')
                   (get g'))
         xf3 #(->> %
@@ -68,20 +66,17 @@
          (map xf3)
          (apply add))))
 
-;; Idiomatic Clojure is to use transducers instead...
-;; ...but the order of composition conflicts when partially applied :(
-;; (defn chain2
+;; (defn chain3
+;;   "Idiomatic Clojure is to use transducers instead...
+;;   ...but the order of composition conflicts when partially applied :("
 ;;   [f g order]
 ;;   (let [f (nth (iterate add-dim f)
 ;;                (dec (long (count (ffirst g)))))
 ;;         f' (diff-unmixed1 f order 1)
 ;;         g' (diff g order)
-;;         xf1 #(*' (long (Math/pow 10 (first %)))
-;;                  (second %)) 
+;;         xf1 #(*' (long (Math/pow 10 %1)) %2)
 ;;         xf2 #(->> %2
-;;                   (interleave (range))
-;;                   (partition 2)
-;;                   (map %) 
+;;                   (map-indexed %1) 
 ;;                   (reduce +')
 ;;                   (get g'))
 ;;         xf3 #(->> %2
@@ -93,42 +88,69 @@
 ;;          (sequence (partial xf3 (partial xf2 xf1)))
 ;;          (apply add)))) 
 
-(defmacro map->
-  "Maps a series of forms over each level of a nested collection.
-  Forms are applied from inside out, e.g. (map `f` (map `f` (map `f`))).
-  All except for deepest (first in argument list) must be unary."
-  [x & forms]
-  (loop [x x
-         forms forms]
-    (if (not-empty (next forms))
-      (let [form (macroexpand (first forms))
-            threaded (if (seq? form)
-                       (with-meta `(->> ~x (map ~(first form)) ~@(next form)) (meta form))
-                       (list `map form x))]
-        (recur threaded (next forms)))
-      (list `map-indexed (first forms) x))))  ;; generalize: s/`map-indexed`/`map`
-
-;; Luckily, we can alway solve that with macros :)
 (defn chain3
+  "A bit closer: lambda lifting with mapping factored out.
+  Only works with fork of Clojure allowing nested literals."
   [f g order]
   (let [f (nth (iterate add-dim f)
                (dec (long (count (ffirst g)))))
         f' (diff-unmixed1 f order 1)
         g' (diff g order)
         x (partition-set order)
-        xf1 (->> (apply mul)
-                 (mul (multi-compose (nth f' (dec (count x))) g)))
-        xf2 (->> (reduce +')
-                 (get g'))
-        xf3 #(*' (long (Math/pow 10 %1)) %2)]  ;; finishing function
+        xf1 #(*' (long (Math/pow 10 %1)) %2)  ;; finishing function 
+        xf2 #(->> %
+                  (reduce +')
+                  (get g'))
+        xf3 #(->> %
+                  (apply mul)
+                  (mul (multi-compose (nth f' (dec (count %))) g)))]
     (apply add
-           (expand
-            '(map-> x
-                    xf3
-                    xf2
-                    xf1)))))
+           (map
+            (comp xf3
+                  #(map xf2 %)
+                  #(map #(map-indexed xf1 %) %))
+            x))))
+
+(defmacro map->
+  "Maps a series of forms over each level of a nested collection.
+  Forms are applied from inside out, e.g. (map (map (map `f`))).
+  All except for deepest (first in argument list) must be unary."
+  [x & forms]
+  (let [mapiter #(let [arg (gensym)]
+                   (list `fn [arg] (list `map % arg)))]
+    (loop [maps (list (nth (iterate mapiter (list `fn '[x] (list `map-indexed (first forms) 'x)))  
+                           (- (count forms) 2)))  ;; eliminate need for this in example
+           forms (next forms)] 
+      (if (not-empty (next forms))
+        (let [form (first forms)
+              threaded (if (seq? form)
+                         (with-meta (nth (iterate mapiter form) (dec (count forms))) (meta form))
+                         (nth (iterate mapiter form) (dec (count forms))))]
+          (recur (cons threaded maps) (next forms)))
+        (list `map (concat (list `comp (first forms)) maps) x)))))
 
 (defn chain4
+  "Instead of `partial`, compose nested lambdas with a threading macro: `map->`"
+  [f g order]
+  (let [f (nth (iterate add-dim f)
+               (dec (long (count (ffirst g)))))
+        f' (diff-unmixed1 f order 1)
+        g' (diff g order)
+        x (partition-set order)
+        xf1 #(*' (long (Math/pow 10 %1)) %2)  ;; finishing function
+        xf2 #(->> %
+                  (reduce +')
+                  (get g'))
+        xf3 #(->> %
+                  (apply mul)
+                  (mul (multi-compose (nth f' (dec (count %))) g)))]
+    (apply add 
+           (map-> x
+                  xf1
+                  xf2
+                  xf3))))
+
+(defn chain5
   "Only works with fork of Clojure allowing nested literals.
   Note that nested variables shadow one another...not ideal." 
   [f g order]
@@ -148,7 +170,7 @@
                     (mul (multi-compose (nth f' (dec (count %))) g))))
          (apply add))))
 
-;; (defn chain5
+;; (defn chain6
 ;;   "*Actual* De Bruijn indices...now write a macro to make this work!" 
 ;;   [f g order]
 ;;   (let [f (nth (iterate add-dim f)
