@@ -1,8 +1,19 @@
 (ns anaphora.church
-  (:require [anaphora.util :refer :all]))
+  (:require [anaphora.util :refer :all]
+            [com.rpl.specter :refer :all :exclude [pred]]))
 
-(def print-church (fn [f] ((f (fn [n] (format "f(%s)" n))) "n")))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Syntactically equivalent string conversion:
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  
+(def c   (fn [f] ((f (fn [n] (format "f(%s)" n))) "n")))
+(defn c' [[f n]] ((f (format "f(%s)" n)) "n"))
 
+;; (def c'  #((% #(format "f(%s)" %)) "n"))
+;; (def c'' #((%1 (format "f(%s)" %2)) "n"))
+ 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;;  Church numerals:
@@ -41,30 +52,37 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
-;;  ...as tagged literals:
+;;  ...as tagged literal (requires fork of Clojure allowing nested literals):
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def zero'   (fn [f] #(%)))
-(def one'    (fn [f] #(f %)))
-(def two'    (fn [f] #(f (f %))))
-(def three'  (fn [f] #(f (f (f %)))))
-(def four'   (fn [f] #(f (f (f (f %))))))
-(def five'   (fn [f] #(f (f (f (f (f %)))))))
-(def six'    (fn [f] #(f (f (f (f (f (f %))))))))
-(def seven'  (fn [f] #(f (f (f (f (f (f (f %)))))))))
-(def eight'  (fn [f] #(f (f (f (f (f (f (f (f %))))))))))
-(def nine'   (fn [f] #(f (f (f (f (f (f (f (f (f %)))))))))))
+(def zero'  #(%))
+(def one'   #(% #(%)))
+(def two'   #(% (%1 #(%))))
+(def three' #(% (% (% #(%)))))
+(def four'  #(% (% (% (% #(%))))))
+(def five'  #(% (% (% (% (% #(%)))))))
+(def six'   #(% (% (% (% (% (% #(%))))))))
+(def seven' #(% (% (% (% (% (% (% #(%)))))))))
+(def eight' #(% (% (% (% (% (% (% (% #(%))))))))))
+(def nine'  #(% (% (% (% (% (% (% (% (% #(%)))))))))))
 
-(def succ' (fn [n] (fn [f] #(f ((n f) %)))))
-(def add'  (fn [m n] (fn [f] #((m f) ((n f) %)))))
-(def mul'  (fn [m n] (fn [f] #((m (n f)) %))))
-(def pow'  (fn [m n] (fn [f] #(((n m) f) %))))
-(def pred' (fn [n] (fn [f] (#((n (fn [g] (fn [h] (h (g f))))) %)) #(%))))
-(def sub'  (fn [m n] (fn [f] #((((n pred) m) f) %))))
+(def succ'' #(%2 ((%1 %2) %3)))
+(def add''  #((%1 %3) ((%2 %3) %4)))
+(def mul''  #((%1 (%2 %3)) %4))
+(def pow''  #(((%1 %2) %3) %4))
+(def pred'' #(((%1 (%5 (%4 %2))) (%3)) %6))
+(def sub''  #((((%2 pred) %1) %3) %4))
 
-(def ctrue'  (fn [a] #(a)))
-(def cfalse' (fn [a] #(%)))
+(def succ' #(% ((#(%) %) #(%))))
+(def add'  #((#(%) %) ((#(%) %) #(%))))
+(def mul'  #((#(%) (#(%) %)) #(%)))
+(def pow'  #(((#(%) #(%)) %) #(%)))
+(def pred' #(#(#(% #(% #(% %))) %)))
+(def sub'  #((((#(%) pred) #(%)) %) #(%)))
+
+(def ctrue'  #(%))
+(def cfalse' '())
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -72,31 +90,43 @@
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def zero'   #(%))
-(def one'    #(%1 %2))
-(def two'    #(%1 (%1 %2)))
-(def three'  #(%1 (%1 (%1 %2))))
-(def four'   #(%1 (%1 (%1 (%1 %2)))))
-(def five'   #(%1 (%1 (%1 (%1 (%1 %2))))))
-(def six'    #(%1 (%1 (%1 (%1 (%1 (%1 %2)))))))
-(def seven'  #(%1 (%1 (%1 (%1 (%1 (%1 (%1 %2))))))))
-(def eight'  #(%1 (%1 (%1 (%1 (%1 (%1 (%1 (%1 %2)))))))))
-(def nine'   #(%1 (%1 (%1 (%1 (%1 (%1 (%1 (%1 (%1 %2))))))))))
+(defmacro fn->
+  "Converts bound variables from De Bruijn indices to curried univariate gensymed fns."  
+  [x]
+  (loop [x x
+         i 9]
+    (if (zero? i)
+      x
+      (let [pattern (re-pattern (str "%" i))
+            fresh-var (gensym)] 
+        (recur (transform (collect TREE symbol? (selected? NAME pattern))
+                          #(if (not-empty %1)
+                             (list `fn [fresh-var]
+                                   (setval [TREE symbol? NAME pattern] (str fresh-var) %2))
+                             %2)
+                          x)
+               (dec i))))))
 
-(def succ' #(%2 ((%1 %2) %2)))
-(def add'  #((%2 %3) ((%1 %3) %4)))
-(def mul'  #((%1 (%2 %3)) %4))
-(def pow'  #(((%1 %1) %3) %4))
-(def pred' #(((%1 (%5 (%4 %2))) %3) (%6)))
-(def sub'  #((((%2 pred) %1) %3) %4))
+;; ((fn [f] ((f (fn [n] (format "f(%s)" n))) "n"))
+;;  (fn [G__11652] (fn [G__11644] (G__11644 (G__11644 G__11652)))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;
-;;  ...as *illegally* tagged literals:
-;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(def zero''  '(fn-> %1))
+(def one''   '(fn-> (%1 %2)))
+(def two''   '(fn-> (%1 (%1 %2))))
+(def three'' '(fn-> (%1 (%1 (%1 %2)))))
+(def four''  '(fn-> (%1 (%1 (%1 (%1 %2))))))
+(def five''  '(fn-> (%1 (%1 (%1 (%1 (%1 %2)))))))
+(def six''   '(fn-> (%1 (%1 (%1 (%1 (%1 (%1 %2))))))))
+(def seven'' '(fn-> (%1 (%1 (%1 (%1 (%1 (%1 (%1 %2)))))))))
+(def eight'' '(fn-> (%1 (%1 (%1 (%1 (%1 (%1 (%1 (%1 %2))))))))))
+(def nine''  '(fn-> (%1 (%1 (%1 (%1 (%1 (%1 (%1 (%1 (%1 %2)))))))))))
 
-(def pred-literal #(#(#(% #(% #(% %))) %) %))
+(def succ'' '(fn-> (%2 ((%1 %2) %3))))
+(def add''  '(fn-> ((%1 %3) ((%2 %3) %4))))
+(def mul''  '(fn-> ((%1 (%2 %3)) %4)))
+(def pow''  '(fn-> (((%1 %2) %3) %4)))
+(def pred'' '(fn-> (((%1 (%5 (%4 %2))) (%3)) %6)))
+(def sub''  '(fn-> ((((%2 pred) %1) %3) %4)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -115,7 +145,7 @@
 (defn church-factorial [n]
   (loop [cnt n
          acc one]
-    (cif (print-church (czero? cnt))
-         (print-church acc)
+    (cif (c (czero? cnt))
+         (c acc)
          (church-factorial (pred cnt)
                            (mul cnt acc)))))

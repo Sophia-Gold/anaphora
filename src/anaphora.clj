@@ -191,7 +191,7 @@
                   xf2
                   xf3))))
 
-;; (defmacro fn->
+;; (defmacro fn->>
 ;;   "Applies a series of forms over each level of a nested collection.
 ;;   Forms are applied from inside out, e.g. (`f` (`f` (`f` `form`)))." 
 ;;   [f x & forms]
@@ -224,9 +224,9 @@
 ;;                   (apply mul)
 ;;                   (mul (multi-compose (nth f' (dec (count %))) g)))]
 ;;     (apply add 
-;;            (fn-> map x
-;;                  xf1
-;;                  xf2))))
+;;            (fn->> map x
+;;                   xf1
+;;                   xf2))))
 
 (defn chain5
   "Only works with fork of Clojure allowing nested literals.
@@ -248,7 +248,7 @@
                     (mul (multi-compose (nth f' (dec (count %))) g))))
          (apply add))))
 
-(defmacro fn->
+(defmacro fn->>
   "Like `->>` but converts bound variables from De Bruijn indices to univariate gensymed fns."  
   [& x]
   (loop [x (macroexpand-1 (cons `->> x))
@@ -274,18 +274,18 @@
                (dec (long (count (ffirst g)))))
         f' (diff-unmixed1 f order 1)
         g' (diff g order)]
-    (fn-> order
-          partition-set
-          (map (->> %1
-                    (map (->> %2
-                              (interleave (range))
-                              (partition 2) 
-                              (map (->> %3 ((fn [[idx v]] (*' (long (Math/pow 10 idx)) v))))) 
-                              (reduce +')
-                              (get g')))
-                    (apply mul)
-                    (mul (multi-compose (nth f' (dec (count %1))) g))))
-          (apply add))))
+    (fn->> order
+           partition-set
+           (map (->> %1
+                     (map (->> %2
+                               (interleave (range))
+                               (partition 2) 
+                               (map (->> %3 ((fn [[idx v]] (*' (long (Math/pow 10 idx)) v))))) 
+                               (reduce +')
+                               (get g')))
+                     (apply mul)
+                     (mul (multi-compose (nth f' (dec (count %1))) g))))
+           (apply add))))
 
 (defn -main []
   )
