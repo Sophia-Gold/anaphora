@@ -1,5 +1,6 @@
 (ns anaphora.church
-  (:require [anaphora.util :refer :all]
+  (:require [anaphora.macros :refer :all]
+            [anaphora.util :refer :all]
             [com.rpl.specter :refer :all :exclude [pred]]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -50,7 +51,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;;  ...as tagged literal (requires fork of Clojure allowing nested literals):
-;;
+2;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; (def zero'  #(%))
@@ -87,23 +88,6 @@
 ;;  ...as indexed literals:
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defmacro fn->
-  "Converts bound variables from De Bruijn indices to curried univariate gensymed fns."  
-  [x]
-  (loop [x x
-         i 9]
-    (if (zero? i)
-      x
-      (let [pattern (re-pattern (str "%" i))
-            fresh-var (gensym)] 
-        (recur (transform (collect TREE symbol? (selected? NAME pattern))
-                          #(if (not-empty %1)
-                             (list `fn [fresh-var]
-                                   (setval [TREE symbol? NAME pattern] (str fresh-var) %2))
-                             %2)
-                          x)
-               (dec i))))))
 
 (def zero''  (fn-> (do %1 %2 "n")))
 (def one''   (fn-> (%1 %2)))

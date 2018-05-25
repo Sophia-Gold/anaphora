@@ -1,7 +1,7 @@
 (ns anaphora.test
   (:require [clojure.test :refer :all]
             [anaphora :refer :all]
-            [anaphora.church :refer :all]))
+            [anaphora.church :refer :all :exclude [pred pred' pred'']]))
 
 (deftest chain-test
   (is (= (chain {[2] 1, [1] 5, [0] 7}

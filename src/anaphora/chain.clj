@@ -201,6 +201,12 @@
   ([f g & more]
    (reduce multi-compose (multi-compose f g) more)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Faà di Bruno variations:
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 ;; (defn chain
 ;;   "Higher-order chain rule using Faà di Bruno's formula.
 ;;    Works over multiple variables in `g` using the \"collapsing partitions\" 
@@ -222,3 +228,87 @@
 ;;                                             (get g'))))
 ;;                           (apply mul)))))
 ;;          (apply add))))
+
+;; (defn chain2
+;;   "Doesn't work... De Bruijn indices fundamentally do not nest!"
+;;   [f g order]
+;;   (let [f (nth (iterate add-dim f)
+;;                (dec (long (count (ffirst g)))))
+;;         f' (diff-unmixed1 f order 1)
+;;         g' (diff g order)] 
+;;     (->> order
+;;          partition-set 
+;;          (map #(mul (multi-compose (nth f' (dec (count %1))) g)
+;;                     (->> %1
+;;                          (map (->> %2
+;;                                    (map-indexed (*' (long (Math/pow 10 %4)) 
+;;                                                     %3))
+;;                                    (reduce +')
+;;                                    (get g')))
+;;                          (apply mul))))
+;;          (apply add))))
+
+;; (defn chain3
+;;   "Idiomatic Clojure is to use transducers instead...
+;;   ...but the order of composition conflicts when partially applied :("
+;;   [f g order]
+;;   (let [f (nth (iterate add-dim f)
+;;                (dec (long (count (ffirst g)))))
+;;         f' (diff-unmixed1 f order 1)
+;;         g' (diff g order)
+;;         xf1 #(*' (long (Math/pow 10 %1)) %2)
+;;         xf2 #(->> %2
+;;                   (map-indexed %1) 
+;;                   (reduce +')
+;;                   (get g'))
+;;         xf3 #(->> %2
+;;                   (map %1)
+;;                   (apply mul)
+;;                   (mul (multi-compose (nth f' (dec (count %2))) g)))]
+;;     (->> order
+;;          partition-set
+;;          (sequence (partial xf3 (partial xf2 xf1)))
+;;          (apply add)))) 
+
+;; (defn chain4
+;;   "Instead of `partial`, compose nested lambdas with a threading macro: `map->`"
+;;   [f g order]
+;;   (let [f (nth (iterate add-dim f)
+;;                (dec (long (count (ffirst g)))))
+;;         f' (diff-unmixed1 f order 1)
+;;         g' (diff g order)
+;;         x (partition-set order)
+;;         xf1 #(->> % 
+;;                   (interleave (range))
+;;                   (partition 2)
+;;                   (map #(*' (long (Math/pow 10 (first %))) (second %)))
+;;                   (reduce +')
+;;                   (get g'))
+;;         xf2 #(->> %
+;;                   (apply mul)
+;;                   (mul (multi-compose (nth f' (dec (count %))) g)))]
+;;     (apply add 
+;;            (map->> x
+;;                    xf1
+;;                    xf2))))
+
+;; (defn chain4'
+;;   [f g order]
+;;   (let [f (nth (iterate add-dim f)
+;;                (dec (long (count (ffirst g)))))
+;;         f' (diff-unmixed1 f order 1)
+;;         g' (diff g order)
+;;         x (partition-set order)
+;;         xf1 #(->> % 
+;;                   (interleave (range))
+;;                   (partition 2)
+;;                   (map #(*' (long (Math/pow 10 (first %))) (second %)))
+;;                   (reduce +')
+;;                   (get g'))
+;;         xf2 #(->> %
+;;                   (apply mul)
+;;                   (mul (multi-compose (nth f' (dec (count %))) g)))]
+;;     (apply add 
+;;            (fn->> map x
+;;                   xf1
+;;                   xf2))))
