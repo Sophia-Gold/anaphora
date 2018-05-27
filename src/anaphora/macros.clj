@@ -1,7 +1,10 @@
 (ns anaphora.macros
   (:require [anaphora.util :refer :all]
             [com.rpl.specter :refer :all]
-            [com.rpl.specter.zipper :refer :all]))
+            [com.rpl.specter.zipper :refer :all]
+            [clojure.tools.analyzer :as ana]
+            [clojure.tools.analyzer.jvm :refer [analyze]]
+            [clojure.tools.analyzer.env :as env]))
 
 (defmacro fn->
   "Converts bound variables from De Bruijn indices to curried univariate gensymed fns."  
