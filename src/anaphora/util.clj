@@ -10,12 +10,40 @@
             [ALL p]
             STAY)))
 
+(def MAP-TREE
+  (recursive-path
+   [] p
+   (if-path map?
+            [ALL p]
+            STAY)))
+
+(def MAP-NODES
+  (recursive-path
+   [] p
+   (cond-path map? (stay-then-continue MAP-VALS p)
+              coll? [ALL p])))
+
+;; (def MAP-NODES
+;;   (recursive-path [] p
+;;    (cond-path map? (stay-then-continue MAP-VALS p)
+;;               coll? [(compact ALL p)])))
+
+(def map-key-walker
+  (recursive-path
+   [akey] p
+   (cond-path map? [ALL (if-path [FIRST #(= % akey)]
+                                 LAST
+                                 [LAST p])]
+              vector? [ALL (if-path map?
+                                    [ALL (if-path [FIRST #(= % akey)]
+                                                  LAST 
+                                                  [LAST p])])])))
+
 (defn expand
   "Pretty-printed macroexpansion with unqualified names."
   [f]
   (->> f
        macroexpand-all
-      ;; (transform [TREE] (comp symbol name))
       fipp))
 
 (defn deepcount

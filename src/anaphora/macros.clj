@@ -1,10 +1,10 @@
 (ns anaphora.macros
   (:require [anaphora.util :refer :all]
+            [anaphora.chain :refer :all]
             [com.rpl.specter :refer :all]
-            [com.rpl.specter.zipper :refer :all]
-            [clojure.tools.analyzer :as ana]
+            [com.rpl.specter.zipper :refer :all] 
             [clojure.tools.analyzer.jvm :refer [analyze]]
-            [clojure.tools.analyzer.env :as env]))
+            [fipp.edn :refer [pprint] :rename {pprint fipp}]))
 
 (defmacro fn->
   "Converts bound variables from De Bruijn indices to curried univariate gensymed fns."  
@@ -92,3 +92,43 @@
                          (nth (iterate mapiter form) (dec (count forms))))]
           (recur (cons threaded maps) (next forms)))
         (list `map (concat (list `comp (first forms)) maps) x)))))
+
+(def chain-ast
+  (fn
+    [f g order]
+    (let [f (nth (iterate add-dim f)
+                 (dec (long (count (ffirst g)))))
+          f' (diff-unmixed1 f order 1)
+          g' (diff g order)] 
+      (->> order
+           partition-set
+           (map (fn [p]
+                  (mul (multi-compose (nth f' (dec (count p))) g)
+                       (->> p
+                            (map (fn [b] (->> b
+                                             (map-indexed #(*' (long (Math/pow 10 %1)) 
+                                                               %2))
+                                             (reduce +')
+                                             (get g'))))
+                            (apply mul)))))
+           (apply add)))))
+
+(defn select-locals
+  [ast] 
+  (select (map-key-walker :locals) ast))
+
+;; #(and (not= :locals (first %)) (not (coll? (second %))))]
+(defn keep-locals
+  [ast]
+  (->> ast
+       (setval [MAP-NODES
+                ALL 
+                (not-selected? FIRST (pred= :locals))
+                (not-selected? FIRST (pred= :params))
+                (not-selected? FIRST (pred= :args))
+                (not-selected? FIRST (pred= :arglist))
+                (not-selected? FIRST (pred= :arglists))
+                (selected? LAST (complement map?))
+                (selected? LAST (complement vector?))]
+               NONE)
+       (setval [MAP-NODES ALL (selected? FIRST (pred= :children))] NONE)))
