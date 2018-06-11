@@ -117,18 +117,29 @@
   [ast] 
   (select (map-key-walker :locals) ast))
 
-;; #(and (not= :locals (first %)) (not (coll? (second %))))]
 (defn keep-locals
   [ast]
-  (->> ast
-       (setval [MAP-NODES
-                ALL 
-                (not-selected? FIRST (pred= :locals))
-                (not-selected? FIRST (pred= :params))
-                (not-selected? FIRST (pred= :args))
-                (not-selected? FIRST (pred= :arglist))
-                (not-selected? FIRST (pred= :arglists))
-                (selected? LAST (complement map?))
-                (selected? LAST (complement vector?))]
-               NONE)
-       (setval [MAP-NODES ALL (selected? FIRST (pred= :children))] NONE)))
+  (setval (filter-keys #(or (= % :locals)
+                            (= % :params)
+                            (= % :args)
+                            (= % :arglist)
+                            (= % :arglists)))
+          NONE
+          ast))
+
+(def data {:baz "qux", :env [{:locals "foo" :k "v"} {:locals "bar"} {:foo "qux"}]})
+
+;; (fipp (keep-locals (analyze '(fn [x y] (fn [a b] (+ x a))))))
+
+;; (keep-locals data)
+;; => {:env [{:locals "foo"} {:locals "bar"}]}
+
+;; (keep-locals {:foo {:bar "baz"}, :locals "baz"})
+;; => {:locals "baz"}
+
+;; (clojure.walk/walk #(cond
+;;                       (not (coll? (last %))) nil
+;;                       (= :locals (first %)) nil
+;;                       :else %)
+;;                    #(remove nil? %)
+;;                    data)

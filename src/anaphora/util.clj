@@ -1,6 +1,6 @@
 (ns anaphora.util
   (:require [clojure.walk :refer [macroexpand-all]]
-            [com.rpl.specter :refer :all :exclude [pred]]
+            [com.rpl.specter :refer :all]
             [fipp.edn :refer [pprint] :rename {pprint fipp}]))
 
 (def TREE
@@ -38,6 +38,24 @@
                                     [ALL (if-path [FIRST #(= % akey)]
                                                   LAST 
                                                   [LAST p])])])))
+
+;; (def filter-keys
+;;   (recursive-path
+;;    [k] p
+;;    (cond-path map? (stay-then-continue
+;;                     ALL
+;;                     (not-selected? (pred= k))
+;;                     LAST
+;;                     p)
+;;               coll? [ALL p])))
+
+(def filter-keys
+  (recursive-path
+   [k] p
+   (cond-path map? [ALL (cond-path [FIRST (pred k)] STOP
+                                   [LAST (pred (complement coll?))] STAY
+                                   :else p)]
+              coll? [ALL p])))
 
 (defn expand
   "Pretty-printed macroexpansion with unqualified names."
