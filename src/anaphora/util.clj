@@ -1,7 +1,11 @@
 (ns anaphora.util
-  (:require [clojure.walk :refer [macroexpand-all]]
-            [com.rpl.specter :refer :all]
-            [fipp.edn :refer [pprint] :rename {pprint fipp}]))
+  (:require  [clojure.spec.alpha :as s]
+             [expound.alpha :as expound]
+             [clojure.walk :refer [macroexpand-all]]
+             [com.rpl.specter :refer :all]
+             [fipp.edn :refer [pprint] :rename {pprint fipp}]))
+
+(set! s/*explain-out* expound/printer)
 
 (def TREE
   (recursive-path

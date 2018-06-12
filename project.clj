@@ -5,6 +5,7 @@
   :dependencies [[local/clojure "1.9.999999"]
                  [org.clojure/spec.alpha "0.1.143"]
                  [org.clojure/core.specs.alpha "0.1.24"]
+                 [expound "0.7.0"]
                  [org.clojure/data.avl "0.0.17"]
                  [org.clojure/data.int-map "0.2.4"]
                  [org.clojure/math.combinatorics "0.1.4"] 
